@@ -1,0 +1,26 @@
+[project]
+name = "human-face-emotions"
+version = "0.1.0"
+description = "Human emotions multi-classification using images of faces."
+authors = [
+    {name = "arseniyx92 khlytchiev.ad@phystech.edu"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas (>=2.3.3,<3.0.0)",
+    "pytorch-lightning (>=2.6.0,<3.0.0)"
+]
+packages = [
+    { include = "human_face_emotions", from="."}
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "fire (>=0.7.1,<0.8.0)"
+]
