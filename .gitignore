@@ -229,3 +229,4 @@ Thumbs.db
 config.local.yaml
 secrets.yaml
 .env.local
+/data
