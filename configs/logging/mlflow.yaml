@@ -1,12 +1,14 @@
 # @package _global_
 logging:
   logger: mlflow
+  
   mlflow:
     experiment_name: emotion-classification
-    tracking_uri: mlruns
+    tracking_uri: ./mlruns  # Используйте ./ для текущей директории
     run_name: null
     tags:
       model: ${model.name}
     log_model: true
+  
   log_every_n_steps: 10
   enable_progress_bar: true

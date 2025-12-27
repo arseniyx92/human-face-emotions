@@ -27,19 +27,41 @@ def get_logger(cfg: DictConfig):
         PyTorch Lightning logger instance.
     """
     if cfg.logging.logger == "mlflow":
-        return MLFlowLogger(
+        # Устанавливаем tracking URI до создания логгера
+        tracking_uri = cfg.logging.mlflow.tracking_uri
+
+        # Преобразуем относительный путь в абсолютный
+        if not tracking_uri.startswith("http"):
+            tracking_uri = str(Path(tracking_uri).absolute())
+
+        mlflow.set_tracking_uri(tracking_uri)
+
+        print(f"MLflow tracking URI: {tracking_uri}")
+        print(f"MLflow experiment: {cfg.logging.mlflow.experiment_name}")
+
+        logger = MLFlowLogger(
             experiment_name=cfg.logging.mlflow.experiment_name,
-            tracking_uri=cfg.logging.mlflow.tracking_uri,
+            tracking_uri=tracking_uri,
             run_name=cfg.logging.mlflow.run_name,
-            tags=OmegaConf.to_container(cfg.logging.mlflow.tags, resolve=True),
-            log_model=cfg.logging.mlflow.log_model,
+            tags=(
+                OmegaConf.to_container(cfg.logging.mlflow.tags, resolve=True)
+                if cfg.logging.mlflow.tags
+                else None
+            ),
+            log_model=cfg.logging.mlflow.get("log_model", True),
         )
+
+        print(f"MLflow run ID: {logger.run_id}")
+
+        return logger
+
     elif cfg.logging.logger == "tensorboard":
         return TensorBoardLogger(
             save_dir=cfg.logging.tensorboard.save_dir,
             name=cfg.logging.tensorboard.name,
         )
     else:
+        print("Warning: No logger configured")
         return None
 
 
@@ -78,6 +100,9 @@ def main(cfg: DictConfig) -> None:
         cfg: Hydra configuration object (automatically injected).
     """
     # Print configuration
+    print("=" * 60)
+    print("Configuration:")
+    print("=" * 60)
     print(OmegaConf.to_yaml(cfg))
 
     # Set seed for reproducibility
@@ -96,12 +121,11 @@ def main(cfg: DictConfig) -> None:
     # Initialize model
     model = EmotionClassifierModule(cfg=cfg, id2label=datamodule.id2label)
 
-    # Get logger
+    # Get logger BEFORE trainer
     logger = get_logger(cfg)
 
-    # Log hyperparameters
-    if logger and isinstance(logger, MLFlowLogger):
-        logger.log_hyperparams(OmegaConf.to_container(cfg, resolve=True))
+    if logger is None:
+        print("WARNING: No logger initialized!")
 
     # Get callbacks
     callbacks = get_callbacks(cfg)
@@ -112,44 +136,66 @@ def main(cfg: DictConfig) -> None:
         accelerator=cfg.training.accelerator,
         devices=cfg.training.devices,
         callbacks=callbacks,
-        logger=logger,
+        logger=logger,  # Убедитесь, что logger передаётся
         enable_progress_bar=cfg.logging.enable_progress_bar,
         log_every_n_steps=cfg.logging.log_every_n_steps,
     )
 
     # Train
+    print("\n" + "=" * 60)
     print("Starting training...")
+    print("=" * 60)
     trainer.fit(model, datamodule)
 
     # Test
+    print("\n" + "=" * 60)
     print("Running test...")
+    print("=" * 60)
     trainer.test(model, datamodule)
 
-    # Log artifacts
-    if mlflow.active_run():
-        # Log best checkpoint
-        best_model_path = trainer.checkpoint_callback.best_model_path
-        if best_model_path:
-            mlflow.log_artifact(best_model_path, "checkpoints")
+    # Log artifacts to MLflow
+    if logger and isinstance(logger, MLFlowLogger):
+        print("\n" + "=" * 60)
+        print("Logging artifacts to MLflow...")
+        print("=" * 60)
 
-        # Export and log ONNX model
-        onnx_path = Path("models/emotion_classifier.onnx")
-        model.export_to_onnx(onnx_path)
-        mlflow.log_artifact(str(onnx_path), "onnx")
+        with mlflow.start_run(run_id=logger.run_id):
+            # Log best checkpoint
+            best_model_path = trainer.checkpoint_callback.best_model_path
+            if best_model_path and Path(best_model_path).exists():
+                mlflow.log_artifact(best_model_path, "checkpoints")
+                print(f"Logged checkpoint: {best_model_path}")
 
-        # Log labels
-        labels_path = Path("models/labels.json")
-        labels_path.parent.mkdir(parents=True, exist_ok=True)
-        labels_path.write_text(json.dumps(datamodule.id2label, indent=2))
-        mlflow.log_artifact(str(labels_path), "config")
+            # Export and log ONNX model
+            onnx_path = Path("models/emotion_classifier.onnx")
+            onnx_path.parent.mkdir(parents=True, exist_ok=True)
+            model.export_to_onnx(onnx_path)
+            mlflow.log_artifact(str(onnx_path), "onnx")
+            print(f"Logged ONNX model: {onnx_path}")
 
-        # Log Hydra config
-        config_path = Path("models/config.yaml")
-        config_path.write_text(OmegaConf.to_yaml(cfg))
-        mlflow.log_artifact(str(config_path), "config")
+            # Log labels
+            labels_path = Path("models/labels.json")
+            labels_path.parent.mkdir(parents=True, exist_ok=True)
+            labels_path.write_text(json.dumps(datamodule.id2label, indent=2))
+            mlflow.log_artifact(str(labels_path), "config")
+            print(f"Logged labels: {labels_path}")
 
-    print(f"\nTraining complete!")
+            # Log Hydra config
+            config_path = Path("models/config.yaml")
+            config_path.write_text(OmegaConf.to_yaml(cfg))
+            mlflow.log_artifact(str(config_path), "config")
+            print(f"Logged config: {config_path}")
+
+    print("\n" + "=" * 60)
+    print("Training complete!")
+    print("=" * 60)
     print(f"Best model: {trainer.checkpoint_callback.best_model_path}")
+
+    if logger and isinstance(logger, MLFlowLogger):
+        print(f"MLflow run ID: {logger.run_id}")
+        print(
+            f"View in MLflow UI: mlflow ui --backend-store-uri {cfg.logging.mlflow.tracking_uri}"
+        )
 
 
 if __name__ == "__main__":
