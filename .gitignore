@@ -232,3 +232,4 @@ secrets.yaml
 /data
 /models
 /checkpoints
+/outputs
