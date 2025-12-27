@@ -1,0 +1,2 @@
+- +checkpoint_path="checkpoints/emotion-epoch=01-val_loss=1.27.ckpt"
+- +images_path="data/happy/25.png"

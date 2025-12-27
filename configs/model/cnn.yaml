@@ -1,0 +1,9 @@
+# @package _global_
+model:
+  name: EmotionCNN
+  num_classes: 5
+  input_size: 48
+  dropout: 0.5
+  conv_channels: [32, 64, 128]
+  kernel_size: 3
+  padding: 1

@@ -230,3 +230,5 @@ config.local.yaml
 secrets.yaml
 .env.local
 /data
+/models
+/checkpoints

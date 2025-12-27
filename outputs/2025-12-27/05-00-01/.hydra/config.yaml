@@ -1,0 +1,62 @@
+model:
+  name: EmotionCNN
+  num_classes: 5
+  input_size: 48
+  dropout: 0.5
+  conv_channels:
+  - 32
+  - 64
+  - 128
+  kernel_size: 3
+  padding: 1
+training:
+  max_epochs: 300
+  batch_size: 512
+  lr: 0.003
+  weight_decay: 0.01
+  optimizer: adamw
+  scheduler:
+    name: reduce_on_plateau
+    factor: 0.5
+    patience: 10
+  early_stopping:
+    patience: 20
+    monitor: val_loss
+    mode: min
+  accelerator: gpu
+  devices: 1
+  num_workers: 13
+  checkpoint:
+    monitor: val_loss
+    save_top_k: 3
+    mode: min
+data:
+  data_dir: ./data
+  image_size: 48
+  train_val_split: 0.8
+  cache_data: true
+  normalize:
+    mean:
+    - 0.5
+    - 0.5
+    - 0.5
+    std:
+    - 0.5
+    - 0.5
+    - 0.5
+logging:
+  logger: mlflow
+  mlflow:
+    experiment_name: emotion-classification
+    tracking_uri: mlruns
+    run_name: null
+    tags:
+      model: ${model.name}
+    log_model: true
+  log_every_n_steps: 10
+  enable_progress_bar: true
+project_name: human-face-emotions
+seed: 42
+checkpoint_path: null
+images_path: null
+output_path: null

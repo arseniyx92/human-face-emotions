@@ -1,0 +1,20 @@
+defaults:
+  - model: cnn
+  - training: default
+  - data: default
+  - logging: mlflow
+  - _self_
+
+project_name: human-face-emotions
+seed: 42
+
+# Inference parameters (optional)
+checkpoint_path: null
+images_path: null
+output_path: null
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: false
